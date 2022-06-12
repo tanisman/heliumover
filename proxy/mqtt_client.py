@@ -20,6 +20,7 @@ class mqtt_client():
         self.thread = threading.Thread(target=self.worker)
         self.thread.daemon = True
         self.thread.start()
+        self.pub_queue = list()
 
     def __del__(self):
         self.thread.raise_exception()
@@ -30,6 +31,10 @@ class mqtt_client():
             # resubscribe to topics
             for key in self.handlers:
                 self.client.subscribe(key)
+            
+            # resend queued messages
+            for topic, payload in self.pub_queue:
+                self.client.publish(topic, payload)
         else:
             logging.error(f"[mqtt] cannot connect mqtt broker rc={rc}")
 
@@ -43,11 +48,18 @@ class mqtt_client():
         logging.debug(f"[mqtt] topic={message.topic}, msg={message.payload}")
 
     def pub(self, topic, payload):
-        self.client.publish(topic, payload)
+        try:
+            self.client.publish(topic, payload)
+        except Exception as e:
+            logging.error(f"[mqtt] failed to publish topic={topic}, payload={payload}, error={e} (queued)")
+            self.pub_queue.append((topic, payload))
 
     def sub(self, topic, callback):
-        self.client.subscribe(topic)
-        self.handlers[topic] = callback
+        try:
+            self.client.subscribe(topic)
+            self.handlers[topic] = callback
+        except Exception as e:
+            logging.error(f"[mqtt] failed to subscribe topic={topic}, error={e}")
 
     def worker(self):
         self.client.loop_forever()

@@ -3,9 +3,8 @@ import threading
 import logging
 import json
 import random
-from base64 import b64decode
-from base58 import b58encode
-
+import helium_api
+import timer
 
 class lora_server():
     def __init__(self, host, port, upstream, pull, tx_ack) -> None:
@@ -35,25 +34,42 @@ class lora_server():
         self.sock.sendto(bytes([2, token[0], token[1], 1]), client) # to gateway (sending in behalf of the miner)
 
         push_data_msg = json.loads(json_object)
-        for rxpk in push_data_msg["rxpk"]:
-            payload = b64decode(rxpk["data"])
-            if len(payload) >= 2 + 33 + 4:
-                pubkey = b58encode(payload[2:2+33]).decode('utf-8')
-                logging.debug(f"[lora_server] got helium beacon from {pubkey}")
-                self.upstream(rxpk)
+        if "rxpk" in push_data_msg:
+            for rxpk in push_data_msg["rxpk"]:
+                # longfi header (3bytes) + longfi oui(7bit encoded) + longfi did (7bit encoded) + longfi fp (4bytes) + longfi seq(7bit encoded) + longfi data (variable)
+                # longfi data for helium msg is IV (2bytes) + OnionCompactKey(33bytes) + Tag (4bytes) + CipherText (variable)
+                msg = helium_api.decrypt_radio(rxpk["data"])
+                if msg is not None:
+                    if msg.header.oui == 0 and msg.header.did == 1:
+                        logging.info(f"[lora_server] got helium beacon poc_id={msg.poc_id} (oui={msg.header.oui} did={msg.header.did}) payload len={len(msg.ciphertext)}")
+                    else:
+                        logging.info(f"[lora_server] maybe got helium beacon poc_id={msg.poc_id} (oui={msg.header.oui} did={msg.header.did}) payload len={len(msg.ciphertext)}")
+                    rxpk["receiver_address"] = helium_api.MY_HOTSPOT['address']
+                    rxpk["receiver_lat"] = helium_api.MY_HOTSPOT['lat']
+                    rxpk["receiver_lng"] = helium_api.MY_HOTSPOT['lng']
+                    rxpk["receiver_gain"] = helium_api.MY_HOTSPOT["gain"]
+                    self.upstream(rxpk)
+        else:
+            self.upstream(push_data_msg)
 
     def process_pull_data(self, client, token, msg):
         logging.debug(f"[lora_server] PULL_DATA received from {client}")
         # send PULL_ACK
         self.sock.sendto(bytes([2, token[0], token[1], 4]), client) # to gateway (sending in behalf of the miner)        
         msgs_to_send = self.pull()
-        for lora_msg in msgs_to_send:
+        for index, lora_msg in enumerate(msgs_to_send):
+            msg = json.loads(lora_msg)
             send_tok = bytes([random.randint(0, 255), random.randint(0, 255)])
-            self.tx_tokens[hash(send_tok)] = hash(json.loads(lora_msg)["txpk"]["data"])
-            
-            self.sock.sendto(
-                bytes([2]) + send_tok + bytes([3]) + lora_msg.encode('utf-8'), 
-                client)
+            self.tx_tokens[hash(send_tok)] = hash(msg["txpk"]["data"])
+            msg["txpk"]["imme"] = True
+
+            # delete custom transmitter field used for poc spoofing
+            del msg["transmitter"]
+
+            timer.add_timer(
+                5 + index, 
+                lambda pair : self.sock.sendto(pair[0], pair[1]), 
+                [bytes([2]) + send_tok + bytes([3]) + json.dumps(msg).encode('utf-8'), client])
 
     def process_tx_ack(self, client, token, msg):
         gateway_id = msg[4:12]
@@ -69,31 +85,34 @@ class lora_server():
                 if "error" in tx_ack_msg["txpk_ack"]:
                     logging.error(f"[lora_server] TX_ACK error {tx_ack_msg['txpk_ack']['error']}")
 
-            self.tx_ack(sent_data_hash, json_object)
+            self.tx_ack(sent_data_hash, tx_ack_msg)
         else:
             logging.debug(f"[lora_server] TX_ACK received from {client}")
             self.tx_ack(sent_data_hash, None)
     
     def worker(self):
         while True:
-            msg, client = self.sock.recvfrom(4096)
-            if len(msg) < 4:
-                logging.error(f"[lora_server] message too short: {msg}")
-                continue
+            try:
+                msg, client = self.sock.recvfrom(4096)
+                if len(msg) < 4:
+                    logging.error(f"[lora_server] message too short: {msg}")
+                    continue
 
-            ver, token, identifier = self.deserialize_lora(msg)
+                ver, token, identifier = self.deserialize_lora(msg)
 
-            if ver != 2:
-                logging.error(f"[lora_server] unknown protocol version {ver}")
-                continue
+                if ver != 2:
+                    logging.error(f"[lora_server] unknown protocol version {ver}")
+                    continue
 
-            if identifier == 0: # PUSH_DATA (upstream initiator)
-                self.process_push_data(client, token, msg)
-            elif identifier == 2: # PULL_DATA (downstream initiator)
-                self.process_pull_data(client, token, msg)
-            elif identifier == 5: # TX_ACK
-                self.process_tx_ack(client, token, msg)
-
+                if identifier == 0: # PUSH_DATA (upstream initiator)
+                    self.process_push_data(client, token, msg)
+                elif identifier == 2: # PULL_DATA (downstream initiator)
+                    self.process_pull_data(client, token, msg)
+                elif identifier == 5: # TX_ACK
+                    self.process_tx_ack(client, token, msg)
+            except Exception as e:
+                logging.error(f"[lora_server:worker] exception: {e}")
+                continue        
 
     def start(self):
         self.thread.start()

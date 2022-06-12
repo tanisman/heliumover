@@ -1,27 +1,16 @@
-from cmath import log
 import math
-from operator import truediv
 import queue
 import socket
 import threading
 import logging
 import random
 import json
-from base64 import b64decode
-from base58 import b58encode
 import helium_api
-from proxy_config import GATEWAY_UID, HELIUM_PUBKEY
+from proxy_config import GATEWAY_UID
 
 
 class lora_client():
     def __init__(self, host, port, downstream) -> None:
-        succ, hotspot = helium_api.get_hostspot(HELIUM_PUBKEY)
-        while not succ:
-            logging.warning("[lora_client] api request failed (self), retrying...")
-            succ, hotspot = helium_api.get_hostspot(HELIUM_PUBKEY)
-        self.hotspot = hotspot["data"]
-        logging.info(f"[lora_client] hotspot: {self.hotspot['address']} (lat={self.hotspot['lat']}, lng={self.hotspot['lng']})")
-
         connected = False
 
         while not connected:
@@ -47,12 +36,17 @@ class lora_client():
         self.thread_up.daemon = True
         self.thread_down = threading.Thread(target=self.worker_down)
         self.thread_down.daemon = True
-        self.known_hotspots = dict()
         self.tx_tokens = dict()
+        self.poc_ids = set()
+        self.known_pocs = dict()
 
     def __del__(self):
         self.thread_up.raise_error()
         self.thread_down.raise_error()
+
+    def on_poc(self, msg):
+        data = json.loads(msg)
+        self.known_pocs[data["poc_id"]] = data
         
     def deserialize_lora(self, msg):
         ver = msg[0]
@@ -60,49 +54,98 @@ class lora_client():
         identifier = msg[3]
         return ver, token, identifier
 
-    def enqueue_push_data(self, msg):
-        logging.debug("[lora_client] enqueue_push_data")
-        push_data_msg = json.loads(msg)
-        payload = b64decode(push_data_msg["data"])
-        pubkey = b58encode(payload[2:2+33]).decode('utf-8')
-
-        if pubkey not in self.known_hotspots:
-            succ, json = helium_api.get_hostspot(pubkey)
-            while not succ:
-                logging.warning("[lora_client] api request failed, retrying...")
-                succ, json = helium_api.get_hostspot(pubkey)
-            
-            self.known_hotspots[pubkey] = json["data"]
-        
-        lng = self.known_hotspots[pubkey]["lng"]
-        lat = self.known_hotspots[pubkey]["lat"]
-
+    def fspl(self, lat1, lng1, lat2, lng2, freq, gain, extra_d = 0):
         R = 6371e3 # metres
-        x1 = lat * (math.pi/180)
-        x2 = self.hotspot["lat"] * (math.pi/180)
-        dx = (self.hotspot["lat"] - lat) * (math.pi/180)
-        dy = (self.hotspot["lng"] - lng) * (math.pi/180)
+        x1 = lat1 * (math.pi/180)
+        x2 = lat2 * (math.pi/180)
+        dx = (lat2 - lat1) * (math.pi/180)
+        dy = (lng2 - lng1) * (math.pi/180)
 
         a = math.sin(dx/2) * math.sin(dx/2) + math.cos(x1) * math.cos(x2) * math.sin(dy/2) * math.sin(dy/2)
         c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
 
-        d = R * c
+        d = R * c + extra_d
         # NOTE: Transmit gain is set to 0 when calculating free_space_path_loss
         # This is because the packet forwarder will be configured to subtract the antenna
         # gain and miner will always transmit at region EIRP.
-        path_loss = 20 * math.log10(d) + 20 * math.log10(push_data_msg["freq"] * 10 ** 6) - 147.55 - 0 - self.known_hotspots["gain"] / 10
+        path_loss = 20 * math.log10(d) + 20 * math.log10(freq) - 147.55 - 0 - gain
         
-        # randomize RSSI value
-        path_loss += random.randint(-30, -1)
+        return path_loss * -1
+
+    def enqueue_push_data(self, msg):
+        self.upstream_queue.put(
+            bytes([2, random.randint(0, 255), random.randint(0, 255), 0]) 
+            + bytes.fromhex(GATEWAY_UID) 
+            + msg.encode("utf-8"))
+
+    def enqueue_push_data(self, msg, stat_only = False):
+        logging.debug("[lora_client] enqueue_push_data")
+        push_data_msg = json.loads(msg)
+
+        if stat_only:
+            self.upstream_queue.put(bytes([2, random.randint(0, 255), random.randint(0, 255), 0]) + bytes.fromhex(GATEWAY_UID) + msg.encode("utf-8"))
+            return
+
+        msg = helium_api.decrypt_radio(push_data_msg["data"])
+        if msg.poc_id in self.poc_ids:
+            logging.info(f"[lora_client] PoC {msg.poc_id} already received by another source")
+            return
         
-        # update rssi value in push_data_msg
-        push_data_msg["rssi"] = path_loss
+        self.poc_ids.add(msg.poc_id)
+        msg_rssi = push_data_msg["rssi"]
+
+        if msg.poc_id in self.known_pocs:
+            logging.info(f"[lora_client] got a known PoC {msg.poc_id} from (transmitter={self.known_pocs[msg.poc_id]['transmitter']}")
+            path_loss = self.fspl(
+                self.known_pocs[msg.poc_id]["lat"],
+                self.known_pocs[msg.poc_id]["lng"],
+                helium_api.MY_HOTSPOT["lat"],
+                helium_api.MY_HOTSPOT["lng"],
+                push_data_msg["freq"] * 10 ** 6,
+                helium_api.MY_HOTSPOT["gain"] / 10,
+            )
+
+            if path_loss > msg_rssi:
+                path_loss = msg_rssi
+
+            # randomize RSSI value
+            path_loss += random.randint(-30, -1)
+
+            # update rssi value in push_data_msg
+            push_data_msg["rssi"] = path_loss
+        else:
+            logging.info(f"[lora_client] got an unknown PoC {msg.poc_id}, using reverse path loss to approximate location")
+            # calculate theorical distance to receiver hotspot
+            d_tx_to_rx = 10 ** ((push_data_msg["rssi"] * -1 + 147.55 + push_data_msg["receiver_gain"] / 10) / 20) / (push_data_msg["freq"] * 10**6)
+
+            path_loss = self.fspl(
+                push_data_msg["receiver_lat"],
+                push_data_msg["receiver_lng"],
+                helium_api.MY_HOTSPOT["lat"],
+                helium_api.MY_HOTSPOT["lng"],
+                push_data_msg["freq"] * 10 ** 6,
+                helium_api.MY_HOTSPOT["gain"] / 10,
+                d_tx_to_rx
+            )
+
+            if path_loss > msg_rssi:
+                path_loss = msg_rssi
+
+            # randomize RSSI value
+            path_loss += random.randint(-30, -1)
+            # update rssi value in push_data_msg
+            push_data_msg["rssi"] = path_loss
+
+        # remove custom inputs
+        del push_data_msg["receiver_lat"]
+        del push_data_msg["receiver_lng"]
+        del push_data_msg["receiver_gain"]
+        del push_data_msg["receiver_address"]
 
         self.upstream_queue.put(
             bytes([2, random.randint(0, 255), random.randint(0, 255), 0]) 
             + bytes.fromhex(GATEWAY_UID) 
-            + json.dumps(push_data_msg).encode("utf-8"))
-
+            + json.dumps({ "rxpk": [push_data_msg] }).encode("utf-8"))
 
     def enqueue_pull_data(self):
         logging.debug("[lora_client] enqueue_pull_data")
@@ -129,16 +172,17 @@ class lora_client():
             self.mutex.release()
 
         pull_data_msg = json.loads(json_object)
+        pull_data_msg["transmitter"] = helium_api.MY_HOTSPOT["address"]
         self.tx_tokens[hash(pull_data_msg["txpk"]["data"])] = token
 
-        self.downstream(json_object)
+        self.downstream(pull_data_msg)
 
     def on_tx_ack(self, data_hash, msg):
         self.mutex.acquire()
         try:
             if self.tx_count > 0:
                 self.tx_count -= 1
-                self.enqueue_tx_ack(msg, data_hash)
+                self.enqueue_tx_ack(json.dumps(msg) if msg is not None else None, data_hash)
         finally:
             self.mutex.release()
 
@@ -148,6 +192,7 @@ class lora_client():
             try:
                 msg = self.upstream_queue.get(block=True, timeout=1)
                 self.sock_up.send(msg)
+                logging.debug(f"[lora_client:worker_up] sent: {msg}")
             except queue.Empty:
                 pass
             
@@ -167,8 +212,10 @@ class lora_client():
                 if identifier != 1:
                     logging.error(f"[lora_client:worker_up] unknown identifier {identifier}")
                     continue
-
-            except socket.timeout as e:
+            except socket.timeout as ste:
+                continue
+            except Exception as e:
+                logging.error(f"[lora_client:worker_up] exception: {e}")
                 continue
 
     def worker_down(self):
@@ -177,6 +224,7 @@ class lora_client():
             try:
                 msg = self.downstream_queue.get(block=True, timeout=1)
                 self.sock_down.send(msg)
+                logging.debug(f"[lora_client:worder_down] sent: {msg}")
             except queue.Empty:
                 pass
             
@@ -197,9 +245,11 @@ class lora_client():
                     pass # ignore
                 elif identifier == 3: # PULL_RESP
                     self.process_pull_resp(self.sock_up, token, msg)
-            except socket.timeout as e:
+            except socket.timeout as ste:
                 continue
-
+            except Exception as e:
+                logging.error(f"[lora_client:worker_down] {e}")
+                continue
 
     def start(self):
         self.thread_up.start()
