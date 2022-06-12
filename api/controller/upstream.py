@@ -76,8 +76,8 @@ class upstream(Resource):
             snr = path_loss - noise_floor
             if snr < -19: # skip if snr below -20dbm (cannot be decoded)
                 continue
-
-            # TODO: txpk to rxpk format
+            
+            # format to rxpk format
             tx_to_rx = {
                 "tmst": pull_data_msg["tmst"],
                 "freq": pull_data_msg["freq"],

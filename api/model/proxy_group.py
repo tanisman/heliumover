@@ -1,5 +1,4 @@
 from datetime import datetime
-from flask_sqlalchemy import SQLAlchemy
 from util import db
 
 class proxy_group(db.Model):
