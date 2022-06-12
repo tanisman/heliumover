@@ -24,3 +24,4 @@ class downstream(Resource):
         )
         db.session.add(new_txpk)
         db.session.commit()
+        return {'message' : 'PoC succesfuly pushed'}, 200
