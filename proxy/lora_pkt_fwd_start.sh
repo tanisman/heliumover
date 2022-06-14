@@ -17,13 +17,12 @@ docker run -d -t -i \
 -e PROXY_PORT=1681 \
 -e MINER_HOST='127.0.0.1' \
 -e MINER_PORT=1680 \
--e MQTT_BROKER_HOST='mukzy0.stackhero-network.com' \
--e MQTT_BROKER_PORT=8883 -e MQTT_CA_CERT='proxy/isrgrootx1.pem' \
--e MQTT_CLIENT_ID='lora-proxy-${GATEWAY_PROXY}' \
--e MQTT_CLIENT_UNAME='admin' \
--e MQTT_CLIENT_PASSW='fzzpGjZIGMQZgMTdjaFSIMr6JtEfn3UN' \
+-e HELIUMOVER_API_KEY='YOUR_API_KEY' \
+-e HELIUMOVER_API_UPSTREAM="https://api.heliumover.com/upstream" \
+-e HELIUMOVER_API_DOWNSTREAM="https://api.heliumover.com/downstream" \
+-e HELIUMOVER_API_HOTSPOT="https://api.heliumover.com/hotspot" \
 --privileged -p 127.0.0.1:1681:1681/udp --network="host" \
---name helium-proxy sh1n3/heliumproxy:1.1.5
+--name helium-proxy sh1n3/heliumover:1.0.1
 
 cd /usr/bin && ./sx1302_test_loragw_reg
 if [ "$?" != "0" ]; then

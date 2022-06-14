@@ -40,6 +40,8 @@ class upstream(Resource):
             path_loss += random.randint(-30, -1)
             path_loss = int(path_loss)
             push_data_msg["rssi"] = path_loss
+            push_data_msg["rssis"] = path_loss
+            push_data_msg["rssic"] = path_loss
 
             # calculate noise floor to calculate snr
             noise_floor_theoretical = int(-174 + math.log10(125 * 1000) * 10) * -1 # 125kHz bandwidth, room temperature
@@ -96,7 +98,7 @@ class upstream(Resource):
 
         requester.last_pocs_sent = datetime.utcnow()
         db.session.commit()
-        return {"pushes":rxpk_list}, 200
+        return {"rxpk":rxpk_list}, 200
     
     @authorize_hotspot
     def post(self, hotspot_address):

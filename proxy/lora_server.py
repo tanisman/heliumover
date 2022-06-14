@@ -3,7 +3,6 @@ import threading
 import logging
 import json
 import random
-import helium_api
 import timer
 
 class lora_server():
@@ -36,19 +35,7 @@ class lora_server():
         push_data_msg = json.loads(json_object)
         if "rxpk" in push_data_msg:
             for rxpk in push_data_msg["rxpk"]:
-                # longfi header (3bytes) + longfi oui(7bit encoded) + longfi did (7bit encoded) + longfi fp (4bytes) + longfi seq(7bit encoded) + longfi data (variable)
-                # longfi data for helium msg is IV (2bytes) + OnionCompactKey(33bytes) + Tag (4bytes) + CipherText (variable)
-                msg = helium_api.decrypt_radio(rxpk["data"])
-                if msg is not None:
-                    if msg.header.oui == 0 and msg.header.did == 1:
-                        logging.info(f"[lora_server] got helium beacon poc_id={msg.poc_id} (oui={msg.header.oui} did={msg.header.did}) payload len={len(msg.ciphertext)}")
-                    else:
-                        logging.info(f"[lora_server] maybe got helium beacon poc_id={msg.poc_id} (oui={msg.header.oui} did={msg.header.did}) payload len={len(msg.ciphertext)}")
-                    rxpk["receiver_address"] = helium_api.MY_HOTSPOT['address']
-                    rxpk["receiver_lat"] = helium_api.MY_HOTSPOT['lat']
-                    rxpk["receiver_lng"] = helium_api.MY_HOTSPOT['lng']
-                    rxpk["receiver_gain"] = helium_api.MY_HOTSPOT["gain"]
-                    self.upstream(rxpk)
+                self.upstream(rxpk)
         else:
             self.upstream(push_data_msg)
 
@@ -57,14 +44,10 @@ class lora_server():
         # send PULL_ACK
         self.sock.sendto(bytes([2, token[0], token[1], 4]), client) # to gateway (sending in behalf of the miner)        
         msgs_to_send = self.pull()
-        for index, lora_msg in enumerate(msgs_to_send):
-            msg = json.loads(lora_msg)
+        for index, msg in enumerate(msgs_to_send):
             send_tok = bytes([random.randint(0, 255), random.randint(0, 255)])
             self.tx_tokens[hash(send_tok)] = hash(msg["txpk"]["data"])
             msg["txpk"]["imme"] = True
-
-            # delete custom transmitter field used for poc spoofing
-            del msg["transmitter"]
 
             timer.add_timer(
                 5 + index, 
