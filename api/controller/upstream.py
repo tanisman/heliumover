@@ -90,6 +90,8 @@ class upstream(Resource):
                 "datr": pull_data_msg["datr"],
                 "codr": pull_data_msg["codr"],
                 "rssi": path_loss,
+                "rssis": path_loss,
+                "rssic": path_loss,
                 "lsnr": snr,
                 "size": pull_data_msg["size"],
                 "data": pull_data_msg["data"],
