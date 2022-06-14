@@ -22,7 +22,7 @@ def internal_server_error(e):
 
 api = Api(app)
 if API_HAS_HOTSPOT:
-    api.add_resource(hotspots, "/hotspot/<string:address>")
+    api.add_resource(hotspots, "/hotspot/<string:hotspot_address>")
 if API_HAS_UPSTREAM:
     api.add_resource(upstream, "/upstream/<string:hotspot_address>")
 if API_HAS_DOWNSTREAM:

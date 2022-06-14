@@ -2,15 +2,13 @@ from flask import request
 from flask_restful import Resource
 from util import db
 from model.hotspot import hotspot
+from auth import authorize_hotspot
 
 class hotspots(Resource):
-    def post(self, address):
-        requesterq = hotspot.query.filter_by(address=address)
-        if requesterq.count() == 0:
-            return {'message' : 'hotspot is not registered'}, 403
-
-        requester = requesterq.first()
-
+    @authorize_hotspot
+    def post(self, hotspot_address):
+        requester = hotspot.query.filter_by(address=hotspot_address).first()
+        
         content = request.get_json()
         lat = content["lat"]
         lng = content["lng"]

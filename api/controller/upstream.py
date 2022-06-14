@@ -7,18 +7,18 @@ from model.hotspot import hotspot
 from model.rxpk import rxpk
 from model.txpk import txpk
 from helium.radio import decrypt_radio, fspl, freq_channel
+from auth import authorize_hotspot
 from sqlalchemy import exc, exists
 import json
 import math
 
 class upstream(Resource):
+    @authorize_hotspot
     def get(self, hotspot_address):
-        requesterq = hotspot.query.filter_by(address=hotspot_address)
-        if requesterq.count() == 0:
-            return {'message' : 'hotspot is not registered'}, 403
-        requester = requesterq.first()
+        requester = hotspot.query.filter_by(address=hotspot_address).first()
+
         rxpk_q = rxpk.query\
-            .filter(group_id=requester.group_id)\
+            .filter(rxpk.group_id==requester.group_id)\
             .filter(rxpk.received_time > requester.last_pocs_sent)\
             .filter(~exists().where(txpk.poc_id == rxpk.poc_id))\
             .order_by(rxpk.received_time)
@@ -53,7 +53,7 @@ class upstream(Resource):
             rxpk_list.append(push_data_msg)
 
         txpk_q = txpk.query\
-            .filter(group_id=requester.group_id)\
+            .filter(txpk.group_id==requester.group_id)\
             .filter(txpk.transmitted_time > requester.last_pocs_sent)\
             .order_by(txpk.transmitted_time)
         
@@ -97,7 +97,8 @@ class upstream(Resource):
         requester.last_pocs_sent = datetime.utcnow()
         db.session.commit()
         return {"pushes":rxpk_list}, 200
-        
+    
+    @authorize_hotspot
     def post(self, hotspot_address):
         push_data_msg = request.get_json()
 
@@ -106,10 +107,7 @@ class upstream(Resource):
             return {'message' : 'not helium PoC'}, 400
         
         try:
-            receiverq = hotspot.query.filter_by(address=hotspot_address)
-            if receiverq.count() == 0:
-                return {'message' : 'hotspot is not registered'}, 403
-            receiver = receiverq.first()
+            receiver = hotspot.query.filter_by(address=hotspot_address).first()
             new_rxpk = rxpk(
                 group_id=receiver.group_id, 
                 poc_id=msg.poc_id, 
