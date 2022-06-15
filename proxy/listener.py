@@ -18,6 +18,7 @@ def lora_upstream(json_object):
         http_status, respose = heliumover_api.post_upstream(helium_api.MY_HOTSPOT["address"], json_object)
         if http_status != 200:
             logging.warning(f"[heliumover] post upstream returned {http_status} ({respose})")
+        downstream_client.enqueue_push_data(json.dumps({"rxpk": [json_object]}))
     else:
         downstream_client.enqueue_push_data(json.dumps(json_object), True)
 
