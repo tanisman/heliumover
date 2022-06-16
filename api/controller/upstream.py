@@ -44,8 +44,12 @@ class upstream(Resource):
             push_data_msg["rssis"] = path_loss
             push_data_msg["rssic"] = path_loss
 
+            bandwidth = 125 * 1000
+            if str(push_data_msg["freq"]) == "904.6" or str(push_data_msg["freq"]) == "907.5":
+                bandwidth = 500 * 1000
+
             # calculate noise floor to calculate snr
-            noise_floor_theoretical = int(-174 + math.log10(125 * 1000) * 10) * -1 # 125kHz bandwidth, room temperature
+            noise_floor_theoretical = int(-174 + math.log10(bandwidth) * 10) * -1 # 125kHz bandwidth, room temperature
             noise_floor = (random.randint(noise_floor_theoretical - 20, noise_floor_theoretical) + round(random.random(), 2)) * -1
             if path_loss < -140:
                 noise_floor = (random.randint(noise_floor_theoretical, noise_floor_theoretical + 20) + round(random.random(), 2)) * -1
@@ -78,7 +82,10 @@ class upstream(Resource):
             path_loss = int(path_loss)
 
             # calculate noise floor to calculate snr
-            noise_floor_theoretical = int(-174 + math.log10(125 * 1000) * 10) * -1 # 125kHz bandwidth, room temperature
+            bandwidth = 125 * 1000
+            if str(pull_data_msg["freq"]) == "904.6" or str(pull_data_msg["freq"]) == "907.5":
+                bandwidth = 500 * 1000
+            noise_floor_theoretical = int(-174 + math.log10(bandwidth) * 10) * -1 # 125kHz bandwidth, room temperature
             noise_floor = (random.randint(noise_floor_theoretical - 20, noise_floor_theoretical) + round(random.random(), 2)) * -1
             if path_loss < -140:
                 noise_floor = (random.randint(noise_floor_theoretical, noise_floor_theoretical + 20) + round(random.random(), 2)) * -1
