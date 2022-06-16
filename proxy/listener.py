@@ -20,7 +20,7 @@ def lora_upstream(json_object):
             logging.warning(f"[heliumover] post upstream returned {http_status} ({respose})")
         downstream_client.enqueue_upstream_msg(json.dumps({"rxpk": [json_object]}))
     else:
-        downstream_client.enqueue_upstream_msg(json.dumps(json_object), True)
+        downstream_client.enqueue_upstream_msg(json.dumps(json_object))
 
 def lora_downstream(json_object):
     global mutex
