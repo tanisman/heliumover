@@ -19,7 +19,7 @@ class upstream(Resource):
 
         rxpk_q = rxpk.query\
             .filter(rxpk.group_id==requester.group_id)\
-            .filter(rxpk.receiver_gain!=hotspot_address)\
+            .filter(rxpk.receiver_address!=hotspot_address)\
             .filter(rxpk.received_time > requester.last_pocs_sent)\
             .filter(~exists().where(txpk.poc_id == rxpk.poc_id))\
             .order_by(rxpk.received_time)

@@ -11,6 +11,7 @@ class rxpk(db.Model):
     receiver_address = db.Column(db.String(128), nullable=False)
     receiver_gain = db.Column(db.Integer, nullable=False)
     received_time = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    group = db.relationship('proxy_group', backref=db.backref('rxpk', lazy='dynamic'))
 
     def __repr__(self):
         return '<rxpk %r>' % self.poc_id

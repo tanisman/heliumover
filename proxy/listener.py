@@ -83,16 +83,17 @@ def main():
     upstream_server.start()
 
     while True:
+        sleep(5)
         try:
             http_status, response = heliumover_api.get_upstream(helium_api.MY_HOTSPOT["address"])
             if http_status != 200:
                 logging.warning(f"[heliumover] get upstream returned {http_status} ({response})")
                 continue
-            downstream_client.enqueue_upstream_msg(json.dumps(response))
+            if len(response["rxpk"]) > 0:
+                downstream_client.enqueue_upstream_msg(json.dumps(response))
         except Exception as e:
             logging.warning(f"[heliumover] get upstream failed: {e}")
             continue
-        sleep(5)
 
 if __name__ == "__main__":
     main()

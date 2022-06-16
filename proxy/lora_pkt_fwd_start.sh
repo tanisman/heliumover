@@ -7,22 +7,23 @@ REGION=`/usr/bin/region_uptd`
 GATEWAY_ID="${MAC_PREFIX}fffe${MAC_POST}"
 echo ${GATEWAY_ID}
 
-docker stop helium-proxy
-docker rm helium-proxy
+docker pull sh1n3/heliumover-proxy
+docker stop heliumover-proxy
+docker rm heliumover-proxy
 
 docker run -d -t -i \
 -e GATEWAY_UID="${GATEWAY_ID}" \
--e HELIUM_PUBKEY='112FsHPgF1G3dPUGytxZY4LpanbHU8z9PjFMgTCfqTVyK2x7bBvh' \
+-e HELIUM_PUBKEY='YOUR_HOTSPOT_ADDRESS' \
 -e PROXY_HOST='127.0.0.1' \
 -e PROXY_PORT=1681 \
 -e MINER_HOST='127.0.0.1' \
 -e MINER_PORT=1680 \
 -e HELIUMOVER_API_KEY='YOUR_API_KEY' \
--e HELIUMOVER_API_UPSTREAM="https://api.heliumover.com/upstream" \
--e HELIUMOVER_API_DOWNSTREAM="https://api.heliumover.com/downstream" \
--e HELIUMOVER_API_HOTSPOT="https://api.heliumover.com/hotspot" \
+-e HELIUMOVER_API_UPSTREAM="http://api.heliumover.com/upstream" \
+-e HELIUMOVER_API_DOWNSTREAM="http://api.heliumover.com/downstream" \
+-e HELIUMOVER_API_HOTSPOT="http://api.heliumover.com/hotspot" \
 --privileged -p 127.0.0.1:1681:1681/udp --network="host" \
---name helium-proxy sh1n3/heliumover:1.0.1
+--name heliumover-proxy sh1n3/heliumover-proxy:latest
 
 cd /usr/bin && ./sx1302_test_loragw_reg
 if [ "$?" != "0" ]; then

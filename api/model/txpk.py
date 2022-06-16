@@ -10,6 +10,7 @@ class txpk(db.Model):
     transmitter_lng = db.Column(db.Float(precision=53), nullable=False)
     transmitter_address = db.Column(db.String(128), nullable=False)
     transmitted_time = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    group = db.relationship('proxy_group', backref=db.backref('txpk', lazy='dynamic'))
 
     def __repr__(self):
         return '<rxpk %r>' % self.poc_id

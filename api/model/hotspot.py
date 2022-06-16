@@ -10,6 +10,7 @@ class hotspot(db.Model):
     gain = db.Column(db.Integer, nullable=False)
     registered_on = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     last_pocs_sent = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    group = db.relationship('proxy_group', backref=db.backref('hotspots', lazy='dynamic'))
 
     def __repr__(self):
         return '<hotspot %r>' % self.address
