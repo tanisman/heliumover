@@ -46,12 +46,16 @@ class upstream(Resource):
 
             # calculate noise floor to calculate snr
             noise_floor_theoretical = int(-174 + math.log10(125 * 1000) * 10) * -1 # 125kHz bandwidth, room temperature
-            noise_floor = random.randint(noise_floor_theoretical - 20, noise_floor_theoretical) + round(random.random(), 2) * -1
+            noise_floor = (random.randint(noise_floor_theoretical - 20, noise_floor_theoretical) + round(random.random(), 2)) * -1
+            if path_loss < -140:
+                noise_floor = (random.randint(noise_floor_theoretical, noise_floor_theoretical + 20) + round(random.random(), 2)) * -1
+            elif path_loss < -123:
+                noise_floor = (random.randint(noise_floor_theoretical - 10, noise_floor_theoretical) + round(random.random(), 2)) * -1
             snr = path_loss - noise_floor
             if snr < -19: # skip if snr below -20dbm (cannot be decoded)
                 continue
 
-            push_data_msg["lsnr"] = snr
+            push_data_msg["lsnr"] = round(snr, 1)
 
             rxpk_list.append(push_data_msg)
 
@@ -75,7 +79,11 @@ class upstream(Resource):
 
             # calculate noise floor to calculate snr
             noise_floor_theoretical = int(-174 + math.log10(125 * 1000) * 10) * -1 # 125kHz bandwidth, room temperature
-            noise_floor = random.randint(noise_floor_theoretical - 20, noise_floor_theoretical) + round(random.random(), 2) * -1
+            noise_floor = (random.randint(noise_floor_theoretical - 20, noise_floor_theoretical) + round(random.random(), 2)) * -1
+            if path_loss < -140:
+                noise_floor = (random.randint(noise_floor_theoretical, noise_floor_theoretical + 20) + round(random.random(), 2)) * -1
+            elif path_loss < -123:
+                noise_floor = (random.randint(noise_floor_theoretical - 10, noise_floor_theoretical) + round(random.random(), 2)) * -1
             snr = path_loss - noise_floor
             if snr < -19: # skip if snr below -20dbm (cannot be decoded)
                 continue
@@ -93,7 +101,7 @@ class upstream(Resource):
                 "rssi": path_loss,
                 "rssis": path_loss,
                 "rssic": path_loss,
-                "lsnr": snr,
+                "lsnr": round(snr, 1),
                 "size": pull_data_msg["size"],
                 "data": pull_data_msg["data"],
             }

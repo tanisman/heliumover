@@ -22,7 +22,7 @@ def decrypt_radio(b64pkt):
             return radio_pkt(header, payload[:2], payload[2:2+33], payload[2+33:2+33+4], payload[2+33+4:])
     return None
 
-def fspl(self, lat1, lng1, lat2, lng2, freq, gain, extra_d = 0):
+def fspl(lat1, lng1, lat2, lng2, freq, gain, extra_d = 0):
     R = 6371e3 # metres
     x1 = lat1 * (math.pi/180)
     x2 = lat2 * (math.pi/180)
