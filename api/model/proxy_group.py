@@ -9,7 +9,4 @@ class proxy_group(db.Model):
     #hotspots = db.relationship('hotspot', backref=db.backref('proxy_group'))
     
     def __repr__(self):
-        return '<proxy_group %r>' % self.name
-
-    def __unicode__(self):
-        return self.name
+        return f"<proxy_group {self.name} (Id: {self.id})>" 

@@ -31,3 +31,4 @@ zipp==3.8.0
 gunicorn==20.1.0
 flask-admin==1.6.0
 flask-login==0.6.1
+tablib==3.2.1

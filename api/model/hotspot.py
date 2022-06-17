@@ -13,4 +13,4 @@ class hotspot(db.Model):
     group = db.relationship('proxy_group', backref=db.backref('hotspots', lazy='dynamic'))
 
     def __repr__(self):
-        return '<hotspot %r>' % self.address
+        return f"<hotspot {self.address}>"

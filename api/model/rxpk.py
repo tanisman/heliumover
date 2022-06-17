@@ -14,4 +14,4 @@ class rxpk(db.Model):
     group = db.relationship('proxy_group', backref=db.backref('rxpk', lazy='dynamic'))
 
     def __repr__(self):
-        return '<rxpk %r>' % self.poc_id
+        return f"<rxpk {self.poc_id}>"
