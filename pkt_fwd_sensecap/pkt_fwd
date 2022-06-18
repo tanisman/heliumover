@@ -1,0 +1,10 @@
+/var/log/pktfwd/pktfwd.log
+{	
+	rotate 10
+	monthly
+	minsize = 10M
+	missingok
+	notifempty
+	nocompress
+	copytruncate
+}

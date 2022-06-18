@@ -1,0 +1,2 @@
+# check every day
+0 0 * * * /usr/sbin/logrotate -f /etc/logrotate.d/pkt_fwd
