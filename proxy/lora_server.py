@@ -35,6 +35,9 @@ class lora_server():
         push_data_msg = json.loads(json_object)
         if "rxpk" in push_data_msg:
             for rxpk in push_data_msg["rxpk"]:
+                if rxpk["size"] < 52:
+                    logging.error(f"[lora_server] message too short be a helium PoC, not pushing")
+                    continue
                 self.upstream(rxpk)
         else:
             self.upstream(push_data_msg)
