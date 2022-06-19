@@ -4,8 +4,8 @@ import heapq
 import logging
 
 class timer_object():
-    def __init__(self, time, callback, object):
-        self.time = time.time() + time
+    def __init__(self, timeInSeconds, callback, object):
+        self.time = time.time() + timeInSeconds
         self.callback = callback
         self.object = object
     def __gt__(self, other):
@@ -28,7 +28,6 @@ def add_timer(time, callback, object):
     heapq.heappush(timer_queue, timer_object(time, callback, object))
 
 def initalize():
-    timer_queue = heapq()
     timer_thread = threading.Thread(target=timer_worker)
     timer_thread.daemon = True
     timer_thread.start()

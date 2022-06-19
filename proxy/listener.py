@@ -7,6 +7,7 @@ import logging
 import json
 import helium_api
 import heliumover_api
+import timer
 
 downstream_client = None
 upstream_server = None
@@ -52,6 +53,8 @@ def main():
     logging.basicConfig(level=logging.DEBUG)
     global downstream_client
     global upstream_server
+
+    timer.initalize()
 
     status, hotspot = helium_api.gethotspot(HELIUM_PUBKEY)
     while status != 200:
