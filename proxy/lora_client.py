@@ -65,10 +65,9 @@ class lora_client():
             payload = payload + msg.encode("utf-8")
         self.downstream_queue.put(payload)
 
-    def process_pull_resp(self, client, token, msg):
-        gateway_id = msg[4:12]
-        json_object = msg[12:].decode('utf-8')
-        logging.debug(f"[lora_client] PULL_RESP received from {client}: {json_object}")
+    def process_pull_resp(self, token, msg):
+        json_object = msg[4:].decode('utf-8')
+        logging.debug(f"[lora_client] PULL_RESP received: {json_object}")
         
         self.mutex.acquire()
         try:
@@ -92,15 +91,15 @@ class lora_client():
 
     def worker_up(self):
         while True:
-            # this only sends PUSH_DATA to miner
+            # this sends to miner
             try:
-                msg = self.upstream_queue.get(block=True, timeout=1)
+                msg = self.upstream_queue.get(block=True, timeout=0.1)
                 self.sock_up.send(msg)
                 logging.debug(f"[lora_client:worker_up] sent: {msg}")
             except queue.Empty:
                 pass
             
-            # this only receives PUSH_ACK from miner and ignores it
+            # this receives from miner
             try:
                 msg = self.sock_up.recv(4096)
                 if len(msg) < 4:
@@ -113,7 +112,14 @@ class lora_client():
                     logging.error(f"[lora_client:worker_up] unknown protocol version {ver}")
                     continue
                 
-                if identifier != 1:
+                if identifier == 1: # PUSH_ACK
+                    pass
+                elif identifier == 3: # PULL_RESP
+                    logging.info("[lora_client:worker_up] PULL_RESP")
+                    self.process_pull_resp(token, msg)
+                elif identifier == 4: # PULL_ACK
+                    pass
+                else:
                     logging.error(f"[lora_client:worker_up] unknown identifier {identifier}")
                     continue
             except socket.timeout as ste:
@@ -126,15 +132,15 @@ class lora_client():
         while True:
             # this sends PULL_DATA and TX_ACK to miner (txack only to beacon owner)
             try:
-                msg = self.downstream_queue.get(block=True, timeout=1)
+                msg = self.downstream_queue.get(block=True, timeout=0.1)
                 self.sock_down.send(msg)
-                logging.debug(f"[lora_client:worder_down] sent: {msg}")
+                logging.debug(f"[lora_client:worker_down] sent: {msg}")
             except queue.Empty:
                 pass
             
             # this receives PULL_ACK and PULL_RESP from miner
             try:
-                msg = self.sock_up.recv(4096)
+                msg = self.sock_down.recv(4096)
                 if len(msg) < 4:
                     logging.error(f"[lora_client:worker_down] message too short: {msg}")
                     continue
@@ -145,10 +151,16 @@ class lora_client():
                     logging.error(f"[lora_client:worker_down] unknown protocol version {ver}")
                     continue
 
-                if identifier == 4: # PULL_ACK
-                    pass # ignore
+                if identifier == 1: # PUSH_ACK
+                    pass
                 elif identifier == 3: # PULL_RESP
-                    self.process_pull_resp(self.sock_up, token, msg)
+                    logging.info("[lora_client:worker_down] PULL_RESP")
+                    self.process_pull_resp(token, msg)
+                elif identifier == 4: # PULL_ACK
+                    pass
+                else:
+                    logging.error(f"[lora_client:worker_down] unknown identifier {identifier}")
+                    continue
             except socket.timeout as ste:
                 continue
             except Exception as e:

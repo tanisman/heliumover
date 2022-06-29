@@ -8,14 +8,26 @@ import json
 import helium_api
 import heliumover_api
 import timer
+from hashlib import sha256
 
 downstream_client = None
 upstream_server = None
 mutex = Lock()
 downstream_queue = []
+known_pocs = set()
+
+def check_poc(rxpk):
+    sha256(rxpk["data"]).hexdigest() in known_pocs
+
+def add_poc(rxpk):
+    known_pocs.add(sha256(rxpk["data"]).hexdigest())
+
 
 def lora_upstream(json_object):
     if "data" in json_object:
+        if check_poc(json_object):
+            return
+        add_poc(json_object)
         http_status, respose = heliumover_api.post_upstream(helium_api.MY_HOTSPOT["address"], json_object)
         if http_status != 200:
             logging.warning(f"[heliumover] post upstream returned {http_status} ({respose})")

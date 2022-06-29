@@ -29,8 +29,7 @@ cd /usr/bin && ./sx1302_test_loragw_reg
 if [ "$?" != "0" ]; then
     # Run SX1308 lora pkt fwd
     if [ "${REGION}" = "EU868" ]; then
-        sed -e "s|/\*.*\*/||" -e "s/AABBCCFFFEDDEEFF/${GATEWAY_ID}/g" /etc/global_conf.json.sx1257.EU868.template \ 
-        | jq '.gateway_conf.serv_port_up = 1681 | .gateway_conf.serv_port_down = 1681' > /etc/global_conf.json
+        sed -e "s|/\*.*\*/||" -e "s/AABBCCFFFEDDEEFF/${GATEWAY_ID}/g" /etc/global_conf.json.sx1257.EU868.template | jq '.gateway_conf.serv_port_up = 1681 | .gateway_conf.serv_port_down = 1681' > /etc/global_conf.json
 
         /usr/bin/reset_lgw.sh start
         cd /usr/bin/ && ./sx1308_lora_pkt_fwd
@@ -40,8 +39,7 @@ if [ "$?" != "0" ]; then
 else
     if [ "${REGION}" = "EU868" ]; then
         # Run SX1302 lora pkt fwd
-        sed -e "s|/\*.*\*/||" -e "s/AABBCCFFFEDDEEFF/${GATEWAY_ID}/g" /etc/global_conf.json.sx1250.EU868.template \
-        | jq '.gateway_conf.serv_port_up = 1681 | .gateway_conf.serv_port_down = 1681' > /etc/global_conf.json
+        sed -e "s|/\*.*\*/||" -e "s/AABBCCFFFEDDEEFF/${GATEWAY_ID}/g" /etc/global_conf.json.sx1250.EU868.template | jq '.gateway_conf.serv_port_up = 1681 | .gateway_conf.serv_port_down = 1681' > /etc/global_conf.json
         cd /usr/bin/ && ./sx1302_lora_pkt_fwd -c /etc/global_conf.json
     else
         echo "SX1302 region error value: ${REGION}"

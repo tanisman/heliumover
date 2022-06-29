@@ -1,0 +1,10 @@
+[Unit]
+Description=heliumover service
+
+[Service]
+ExecStartPre=/bin/sh -c '(while ! balena container ls --format '{{.Names}}' | grep \"pktfwd_\"; do echo \"waiting pktfwd container\"; sleep 2; done); sleep 2'
+ExecStart=/bin/sh /usr/bin/sensecap_start.sh
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target

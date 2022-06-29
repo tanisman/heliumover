@@ -31,12 +31,12 @@ do_start() {
     docker rm heliumover-proxy
     docker run -d -t -i \
     -e GATEWAY_UID="${gateway_id}" \
-    -e HELIUM_PUBKEY='11mv78m1SBHTZLGbg4oaH9i2oYQePjT7KWeiZJwWXiXKGEsm2xH' \
+    -e HELIUM_PUBKEY='YOUR_HOTSPOT_ADDRESS' \
     -e PROXY_HOST='127.0.0.1' \
     -e PROXY_PORT=1681 \
     -e MINER_HOST='127.0.0.1' \
     -e MINER_PORT=1680 \
-    -e HELIUMOVER_API_KEY='8d4a82b1fe044ed5ba27e45ce406e9d0' \
+    -e HELIUMOVER_API_KEY='YOUR_API_KEY' \
     -e HELIUMOVER_API_UPSTREAM="http://api.heliumover.com/upstream" \
     -e HELIUMOVER_API_DOWNSTREAM="http://api.heliumover.com/downstream" \
     -e HELIUMOVER_API_HOTSPOT="http://api.heliumover.com/hotspot" \

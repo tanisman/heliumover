@@ -65,6 +65,7 @@ class upstream(Resource):
 
         txpk_q = txpk.query\
             .filter(txpk.group_id==requester.group_id)\
+            .filter(txpk.transmitter_address!=hotspot_address)\
             .filter(txpk.transmitted_time > requester.last_pocs_sent)\
             .order_by(txpk.transmitted_time)
         
