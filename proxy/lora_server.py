@@ -70,6 +70,9 @@ class lora_server():
             if "txpk_ack" in tx_ack_msg:
                 if "error" in tx_ack_msg["txpk_ack"]:
                     logging.error(f"[lora_server] TX_ACK error {tx_ack_msg['txpk_ack']['error']}")
+                elif "warn" in tx_ack_msg["txpk_ack"]:
+                    self.tx_ack(sent_data_hash, None)
+                    return
 
             self.tx_ack(sent_data_hash, tx_ack_msg)
         else:
